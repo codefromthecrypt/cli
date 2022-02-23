@@ -3,10 +3,10 @@ package cli
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/tcnksm/go-input"
 	"gopkg.in/yaml.v3"
@@ -125,7 +125,7 @@ func (c *NewCmd) Run(ctx *Context) error {
 		}
 	}
 
-	err = c.copy(templatePath, projectPath)
+	err = c.copy(templatePath, projectPath, c.Variables)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (c *NewCmd) Run(ctx *Context) error {
 	return nil
 }
 
-func (c *NewCmd) copy(source, destination string) error {
+func (c *NewCmd) copy(source, destination string, variables map[string]string) error {
 	return filepath.Walk(source, func(path string, info os.FileInfo, ferr error) error {
 		var relPath string = strings.Replace(path, source, "", 1)
 		if relPath == "" {
@@ -161,7 +161,12 @@ func (c *NewCmd) copy(source, destination string) error {
 			return err
 		}
 		if info.IsDir() {
-			return os.Mkdir(filepath.Join(destination, relPath), stat.Mode())
+			dstPath := filepath.Join(destination, relPath)
+			dstPath, err = injectPathVariables(dstPath, variables)
+			if err != nil {
+				return err
+			}
+			return os.Mkdir(dstPath, stat.Mode())
 		} else {
 			base := filepath.Base(sourcePath)
 			if base == ".keep" || base == ".gitkeep" ||
@@ -188,7 +193,24 @@ func (c *NewCmd) copy(source, destination string) error {
 				relPath = relPath[:len(relPath)-5]
 			}
 
-			return os.WriteFile(filepath.Join(destination, relPath), data, stat.Mode())
+			dstPath := filepath.Join(destination, relPath)
+			dstPath, err = injectPathVariables(dstPath, variables)
+			if err != nil {
+				return err
+			}
+			return os.WriteFile(dstPath, data, stat.Mode())
 		}
 	})
+}
+
+func injectPathVariables(dstPath string, variables map[string]string) (string, error) {
+	tmpl, err := template.New("destPath").Parse(dstPath)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err = tmpl.Execute(&buf, variables); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
