@@ -44,7 +44,7 @@ type Target struct {
 }
 
 const generateTemplate = `import { parse } from "@apexlang/core";
-import { Context, Writer } from "@apexlang/core/ast";
+import { Context, Writer } from "@apexlang/core/model";
 import { {{visitorClass}} } from "{{module}}";
 
 function resolver(location, from) {
@@ -57,11 +57,11 @@ function resolver(location, from) {
 
 export function generate(spec, config) {
   const doc = parse(spec, resolver);
-  const context = new Context(config);
+  const context = new Context(config, doc);
 
   const writer = new Writer();
   const visitor = new {{visitorClass}}(writer);
-  doc.accept(context, visitor);
+  context.accept(context, visitor);
   let source = writer.string();
 
   return source;
