@@ -35,7 +35,7 @@ getSystemInfo() {
 }
 
 verifySupported() {
-    local supported=(darwin-amd64 linux-amd64 linux-arm linux-arm64)
+    local supported=(darwin-amd64 darwin-arm64 linux-amd64 linux-arm)
     local current_osarch="${OS}-${ARCH}"
 
     for osarch in "${supported[@]}"; do

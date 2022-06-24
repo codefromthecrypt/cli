@@ -31,19 +31,19 @@ TODO
 Windows
 
 ```
-powershell -Command "iwr -useb https://raw.githubusercontent.com/apexlang/cli/master/install/install.ps1 | iex"
+powershell -Command "iwr -useb https://raw.githubusercontent.com/apexlang/cli/main/install/install.ps1 | iex"
 ```
 
 MacOS
 
 ```
-curl -fsSL https://raw.githubusercontent.com/apexlang/cli/master/install/install.sh | /bin/bash
+curl -fsSL https://raw.githubusercontent.com/apexlang/cli/main/install/install.sh | /bin/bash
 ```
 
 Linux
 
 ```
-wget -q https://raw.githubusercontent.com/apexlang/cli/master/install/install.sh -O - | /bin/bash
+wget -q https://raw.githubusercontent.com/apexlang/cli/main/install/install.sh -O - | /bin/bash
 ```
 
 Homebrew
