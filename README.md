@@ -2,24 +2,24 @@
 
 **noun**
 
-__1__. the top or highest part of something
+**1**. the top or highest part of something
 
 **language**
 
-__2__. a top-down / API-first description language for modeling and generating cloud-native applications
+**2**. a top-down / API-first description language for modeling and generating cloud-native applications
 
 ### Goals:
 
-* <ins>A</ins>pproachable
-* <ins>P</ins>rotocol agnostic
-* <ins>Ex</ins>tensible
- 
+- <ins>A</ins>pproachable
+- <ins>P</ins>rotocol agnostic
+- <ins>Ex</ins>tensible
+
 ### Problem
- 
+
 TODO
- 
+
 ### Solution
- 
+
 TODO
 
 ### Overview
@@ -81,11 +81,12 @@ go install ./cmd/...
 In order to build a project using v8go on Windows, Go requires a gcc compiler to be installed.
 
 To set this up:
+
 1. Install MSYS2 (https://www.msys2.org/)
 2. Add the Mingw-w64 bin to your PATH environment variable (`C:\msys64\mingw64\bin` by default)
 3. Open MSYS2 MSYS and execute `pacman -S mingw-w64-x86_64-toolchain`
 
-V8 requires 64-bit on Windows, therefore it will not work on 32-bit systems. 
+V8 requires 64-bit on Windows, therefore it will not work on 32-bit systems.
 
 Confirm `apex` runs (The Go installation should add `~/go/bin` in your `PATH`)
 
@@ -114,6 +115,9 @@ Commands:
   new <template> <dir> [<variables> ...]
     Creates a new project from a template.
 
+  init <template> [<variables> ...]
+    Initializes an existing project directory from a template.
+
   upgrade
     Upgrades to the latest base modules dependencies.
 
@@ -124,10 +128,10 @@ Run "apex <command> --help" for more information on a command.
 
 ## Built With
 
-* [esbuild](https://esbuild.github.io/) - An extremely fast JavaScript bundler written in Go that is used to compile the code generation TypeScript modules into JavaScript that can run natively in V8.
-* [v8go](https://github.com/rogchap/v8go) and [V8](https://v8.dev/) - Execute JavaScript from Go
-* [kong](https://github.com/alecthomas/kong) - A very simple and easy to use command-line parser for Go
-* [The Go 1.16 embed package](https://golang.org/pkg/embed/) - Finally embedding files is built into the Go toolchain!
+- [esbuild](https://esbuild.github.io/) - An extremely fast JavaScript bundler written in Go that is used to compile the code generation TypeScript modules into JavaScript that can run natively in V8.
+- [v8go](https://github.com/rogchap/v8go) and [V8](https://v8.dev/) - Execute JavaScript from Go
+- [kong](https://github.com/alecthomas/kong) - A very simple and easy to use command-line parser for Go
+- [The Go 1.16 embed package](https://golang.org/pkg/embed/) - Finally embedding files is built into the Go toolchain!
 
 ## Contributing
 

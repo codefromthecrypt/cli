@@ -20,6 +20,8 @@ var commands struct {
 	Watch cli.WatchCmd `cmd:"" help:"Watch configuration files for changes and trigger code generation."`
 	// New creates a new project from a template.
 	New cli.NewCmd `cmd:"" help:"Creates a new project from a template."`
+	// Init initializes an existing project directory from a template.
+	Init cli.InitCmd `cmd:"" help:"Initializes an existing project directory from a template."`
 	// Upgrade reinstalls the base module dependencies.
 	Upgrade cli.UpgradeCmd `cmd:"" help:"Upgrades to the latest base modules dependencies."`
 	// Version prints out the version of this program and runtime info.
