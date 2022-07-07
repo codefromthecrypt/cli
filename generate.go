@@ -41,6 +41,12 @@ type Target struct {
 	IfNotExists  bool                   `json:"ifNotExists,omitempty" yaml:"ifNotExists,omitempty"`
 	Executable   bool                   `json:"executable,omitempty" yaml:"executable,omitempty"`
 	Config       map[string]interface{} `json:"config,omitempty" yaml:"config,omitempty"`
+	RunAfter     []Command              `json:"runAfter" yaml:"runAfter"`
+}
+
+type Command struct {
+	Command string `json:"command" yaml:"command"`
+	Dir     string `json:"dir" yaml:"dir"`
 }
 
 const generateTemplate = `import { parse } from "@apexlang/core";
@@ -157,7 +163,7 @@ func (c *GenerateCmd) generate(config Config) error {
 				ResolveDir: srcDir,
 			},
 			Bundle:    true,
-			NodePaths: []string{srcDir},
+			NodePaths: []string{".", srcDir},
 			LogLevel:  api.LogLevelInfo,
 		})
 		if len(result.Errors) > 0 {
@@ -223,10 +229,15 @@ func (c *GenerateCmd) generate(config Config) error {
 		}
 		defer j.Dispose()
 
-		if target.Config == nil {
-			target.Config = map[string]interface{}{}
+		configMap := make(map[string]interface{}, len(config.Config)+len(target.Config))
+		for k, v := range config.Config {
+			configMap[k] = v
 		}
-		res, err := j.Invoke("generate", spec, target.Config)
+		for k, v := range target.Config {
+			configMap[k] = v
+		}
+		configMap["$filename"] = filename
+		res, err := j.Invoke("generate", spec, configMap)
 		if err != nil {
 			if jserr, ok := err.(*v8go.JSError); ok {
 				jserr.Message = strings.TrimPrefix(jserr.Message, "Error: ")
@@ -278,6 +289,25 @@ func (c *GenerateCmd) generate(config Config) error {
 		case ".py":
 			fmt.Printf("Formatting %s...\n", filename)
 			if err = formatPython(filename); err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, target := range config.Generates {
+		for _, command := range target.RunAfter {
+			lines := strings.Split(strings.TrimSpace(command.Command), "\n")
+			for i := range lines {
+				lines[i] = strings.TrimSpace(lines[i])
+			}
+			joined := strings.Join(lines, " ")
+			commandParts := strings.Split(joined, " ")
+			fmt.Println("Running:", joined)
+			cmd := exec.Command(commandParts[0], commandParts[1:]...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Dir = command.Dir
+			if err = cmd.Run(); err != nil {
 				return err
 			}
 		}

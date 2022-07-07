@@ -29,6 +29,17 @@ var commands struct {
 }
 
 func main() {
+	cli.AddModuleAliases(map[string]string{
+		"local":  "@apexlang/codegen/local",
+		"module": "@apexlang/codegen/module",
+	})
+	cli.AddDependencies(map[string][]string{
+		"@apexlang/codegen": {
+			"src/@apexlang/codegen",
+			"templates/@apexlang/codegen",
+			"definitions/@apexlang",
+		},
+	})
 	ctx := kong.Parse(&commands)
 	// Call the Run() method of the selected parsed command.
 	err := ctx.Run(&cli.Context{})

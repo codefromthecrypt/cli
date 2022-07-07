@@ -50,6 +50,8 @@ func (c *InstallCmd) doRun(ctx *Context, homeDir string) error {
 
 	c.createHTTPClient()
 
+	fmt.Printf("Getting release info for %s...\n", c.Location)
+
 	release, err := c.getReleaseInfo(c.Location, c.Release)
 	if err != nil {
 		return err
@@ -202,10 +204,13 @@ func (c *InstallCmd) getReleaseInfoFromNPM(location, releaseTag string) (*releas
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("could not get NPM release info: got status %d, expected 200", resp.StatusCode)
+	}
 
 	var v version
 	if err = json.NewDecoder(resp.Body).Decode(&v); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not decode NPM release info: %w", err)
 	}
 
 	var org string

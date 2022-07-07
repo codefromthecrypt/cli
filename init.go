@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -123,6 +124,26 @@ func (c *InitCmd) Run(ctx *Context) error {
 		}
 		err = os.WriteFile(specFilename, specBytes, 0644)
 		if err != nil {
+			return err
+		}
+	}
+
+	// TODO: Make dynamic (and secure)
+	switch c.Template {
+	case "@apexlang/codegen/local":
+		cmd := exec.Command("npm", "install")
+		cmd.Dir = filepath.Join(c.Dir, "codegen")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err = cmd.Run(); err != nil {
+			return err
+		}
+	case "@apexlang/codegen/module":
+		cmd := exec.Command("npm", "install")
+		cmd.Dir = c.Dir
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err = cmd.Run(); err != nil {
 			return err
 		}
 	}
