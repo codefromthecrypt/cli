@@ -172,15 +172,23 @@ func (c *GenerateCmd) generate(config Config) error {
 		generateTS = strings.Replace(generateTS, "{{module}}", target.Module, 1)
 		generateTS = strings.Replace(generateTS, "{{visitorClass}}", target.VisitorClass, -1)
 
+		// Get working directory so that modules can be loaded
+		// relative to the project's root directory.
+		workingDir, err := os.Getwd()
+		if err != nil {
+			workingDir = "."
+		}
+
 		result := api.Build(api.BuildOptions{
 			Stdin: &api.StdinOptions{
 				Contents:   generateTS,
 				Sourcefile: "generate.ts",
-				ResolveDir: srcDir,
+				ResolveDir: workingDir,
 			},
-			Bundle:    true,
-			NodePaths: []string{".", srcDir},
-			LogLevel:  api.LogLevelInfo,
+			Bundle:        true,
+			AbsWorkingDir: workingDir,
+			NodePaths:     []string{workingDir, srcDir},
+			LogLevel:      api.LogLevelInfo,
 		})
 		if len(result.Errors) > 0 {
 			return fmt.Errorf("esbuild returned errors: %v", result.Errors)
