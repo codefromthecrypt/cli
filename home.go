@@ -28,6 +28,7 @@ import (
 var baseDependencies = map[string][]string{
 	"@apexlang/core": {
 		"src/@apexlang/core",
+		"templates/@apexlang/core",
 	},
 }
 
