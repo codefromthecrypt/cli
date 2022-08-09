@@ -30,6 +30,7 @@ import (
 	"sync"
 
 	"github.com/evanw/esbuild/pkg/api"
+	"go.uber.org/multierr"
 	"gopkg.in/yaml.v3"
 	"rogchap.com/v8go"
 
@@ -107,13 +108,14 @@ func (c *GenerateCmd) Run(ctx *Context) error {
 		return err
 	}
 
+	var merr error
 	for _, config := range configs {
 		if err := c.generate(config); err != nil {
-			return err
+			merr = multierr.Append(merr, err)
 		}
 	}
 
-	return nil
+	return merr
 }
 
 func (c *GenerateCmd) generateConfig(config Config) error {
@@ -139,12 +141,16 @@ func (c *GenerateCmd) generate(config Config) error {
 	}
 	srcDir := filepath.Join(homeDir, "src")
 
+	var merr error
+
 	for filename, target := range config.Generates {
 		if target.Module == "" {
-			return fmt.Errorf("module is required for %s", filename)
+			merr = appendAndPrintError(merr, "module is required for %s", filename)
+			continue
 		}
 		if target.VisitorClass == "" {
-			return fmt.Errorf("visitorClass is required for %s", filename)
+			merr = appendAndPrintError(merr, "visitorClass is required for %s", filename)
+			continue
 		}
 		if target.IfNotExists {
 			_, err := os.Stat(filename)
@@ -249,7 +255,8 @@ func (c *GenerateCmd) generate(config Config) error {
 			"resolverCallback": resolverCallback,
 		})
 		if err != nil {
-			return err
+			merr = appendAndPrintError(merr, "Compilation error: %w", err)
+			continue
 		}
 		defer j.Dispose()
 
@@ -266,7 +273,8 @@ func (c *GenerateCmd) generate(config Config) error {
 			if jserr, ok := err.(*v8go.JSError); ok {
 				jserr.Message = strings.TrimPrefix(jserr.Message, "Error: ")
 			}
-			return err
+			merr = appendAndPrintError(merr, "Generation error: %w", err)
+			continue
 		}
 
 		source := res.(string)
@@ -275,14 +283,16 @@ func (c *GenerateCmd) generate(config Config) error {
 		case ".ts":
 			source, err = c.formatTypeScript(source)
 			if err != nil {
-				return err
+				merr = appendAndPrintError(merr, "Error formatting TypeScript: %w", err)
+				continue
 			}
 		}
 
 		dir := filepath.Dir(filename)
 		if dir != "" {
 			if err = os.MkdirAll(dir, 0777); err != nil {
-				return err
+				merr = appendAndPrintError(merr, "Error creating directory: %w", err)
+				continue
 			}
 		}
 
@@ -291,7 +301,8 @@ func (c *GenerateCmd) generate(config Config) error {
 			fileMode = 0777
 		}
 		if err = os.WriteFile(filename, []byte(source), fileMode); err != nil {
-			return err
+			merr = appendAndPrintError(merr, "Error writing file: %w", err)
+			continue
 		}
 	}
 
@@ -303,17 +314,20 @@ func (c *GenerateCmd) generate(config Config) error {
 		case ".rs":
 			fmt.Printf("Formatting %s...\n", filename)
 			if err = formatRust(filename); err != nil {
-				return err
+				merr = appendAndPrintError(merr, "Error formatting Rust: %w", err)
+				continue
 			}
 		case ".go":
 			fmt.Printf("Formatting %s...\n", filename)
 			if err = formatGolang(filename); err != nil {
-				return err
+				merr = appendAndPrintError(merr, "Error formatting Go: %w", err)
+				continue
 			}
 		case ".py":
 			fmt.Printf("Formatting %s...\n", filename)
 			if err = formatPython(filename); err != nil {
-				return err
+				merr = appendAndPrintError(merr, "Error formatting Python: %w", err)
+				continue
 			}
 		}
 	}
@@ -332,12 +346,13 @@ func (c *GenerateCmd) generate(config Config) error {
 			cmd.Stderr = os.Stderr
 			cmd.Dir = command.Dir
 			if err = cmd.Run(); err != nil {
-				return err
+				merr = appendAndPrintError(merr, "Error running command: %s, %w", joined, err)
+				continue
 			}
 		}
 	}
 
-	return nil
+	return merr
 }
 
 //go:embed prettier.js
@@ -418,4 +433,10 @@ func readConfigs(configFile string) ([]Config, error) {
 	}
 
 	return configs, nil
+}
+
+func appendAndPrintError(merr error, format string, a ...interface{}) error {
+	err := fmt.Errorf(format, a...)
+	fmt.Println(err)
+	return multierr.Append(merr, err)
 }
