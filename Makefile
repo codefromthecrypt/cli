@@ -1,5 +1,5 @@
 PACKAGE_NAME       := github.com/apexlang/apex
-GO_VERSION         ?= 1.17.7
+GO_VERSION         ?= 1.19
 
 .PHONY: release-dry-run
 release-dry-run:
