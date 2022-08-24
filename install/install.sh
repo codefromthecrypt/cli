@@ -18,6 +18,8 @@ APEX_CLI_FILENAME=apex
 
 APEX_CLI_FILE="${APEX_INSTALL_DIR}/${APEX_CLI_FILENAME}"
 
+APEX_EXISTS=false
+
 getSystemInfo() {
     ARCH=$(uname -m)
     case $ARCH in
@@ -70,11 +72,12 @@ checkHttpRequestCLI() {
     fi
 }
 
-checkExistingapex() {
+checkExistingApex() {
     if [ -f "$APEX_CLI_FILE" ]; then
         echo -e "\nApex CLI is detected:"
         $APEX_CLI_FILE version
         echo -e "Reinstalling Apex CLI - ${APEX_CLI_FILE}...\n"
+        APEX_EXISTS=true
     else
         echo -e "Installing Apex CLI...\n"
     fi
@@ -127,6 +130,10 @@ installFile() {
     fi
 
     chmod o+x $tmp_root_apex_cli
+    # Remove existing file to prevent signature caching.
+    if [ "$APEX_EXISTS" = true ]; then
+        runAsRoot rm "$APEX_INSTALL_DIR/$APEX_CLI_FILENAME"    
+    fi
     runAsRoot cp "$tmp_root_apex_cli" "$APEX_INSTALL_DIR"
 
     if [ -f "$APEX_CLI_FILE" ]; then
@@ -166,7 +173,7 @@ trap "fail_trap" EXIT
 
 getSystemInfo
 verifySupported
-checkExistingapex
+checkExistingApex
 checkHttpRequestCLI
 
 
