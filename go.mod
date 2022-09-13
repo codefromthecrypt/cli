@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/alecthomas/kong v0.6.1
-	github.com/evanw/esbuild v0.15.1
+	github.com/evanw/esbuild v0.15.7
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/google/go-github/v33 v33.0.0
 	github.com/jedib0t/go-pretty/v6 v6.3.6

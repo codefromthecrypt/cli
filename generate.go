@@ -68,7 +68,7 @@ type Command struct {
 
 const generateTemplate = `import { parse } from "@apexlang/core";
 import { Context, Writer } from "@apexlang/core/model";
-import { {{visitorClass}} } from "{{module}}";
+import {{importClass}} from "{{module}}";
 
 function resolver(location, from) {
   const source = resolverCallback(location, from);
@@ -148,9 +148,11 @@ func (c *GenerateCmd) generate(config Config) error {
 			merr = appendAndPrintError(merr, "module is required for %s", filename)
 			continue
 		}
+		importClass := "{ " + target.VisitorClass + " }"
+		visitorClass := target.VisitorClass
 		if target.VisitorClass == "" {
-			merr = appendAndPrintError(merr, "visitorClass is required for %s", filename)
-			continue
+			importClass = "DefaultVisitor"
+			visitorClass = importClass
 		}
 		if target.IfNotExists {
 			_, err := os.Stat(filename)
@@ -176,7 +178,8 @@ func (c *GenerateCmd) generate(config Config) error {
 		fmt.Printf("Generating %s...\n", filename)
 		generateTS := generateTemplate
 		generateTS = strings.Replace(generateTS, "{{module}}", target.Module, 1)
-		generateTS = strings.Replace(generateTS, "{{visitorClass}}", target.VisitorClass, -1)
+		generateTS = strings.Replace(generateTS, "{{importClass}}", importClass, 1)
+		generateTS = strings.Replace(generateTS, "{{visitorClass}}", visitorClass, 1)
 
 		// Get working directory so that modules can be loaded
 		// relative to the project's root directory.
