@@ -275,8 +275,10 @@ func (c *GenerateCmd) generate(config Config) error {
 		if err != nil {
 			if jserr, ok := err.(*v8go.JSError); ok {
 				jserr.Message = strings.TrimPrefix(jserr.Message, "Error: ")
+				merr = appendAndPrintError(merr, "Runtime Error: %s", jserr.StackTrace)
+			} else {
+				merr = appendAndPrintError(merr, "Generation error: %w", err)
 			}
-			merr = appendAndPrintError(merr, "Generation error: %w", err)
 			continue
 		}
 
