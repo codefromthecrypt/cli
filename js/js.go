@@ -92,7 +92,7 @@ func (js *JS) Invoke(function string, args ...interface{}) (interface{}, error) 
 		argList.WriteString(argName)
 	}
 
-	res, err := js.ctx.RunScript(`js_exports.`+function+`(`+argList.String()+`);`, "test.js")
+	res, err := js.ctx.RunScript(`js_exports.`+function+`(`+argList.String()+`);`, function)
 	if err != nil {
 		return nil, err
 	}

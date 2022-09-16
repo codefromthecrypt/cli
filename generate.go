@@ -26,10 +26,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/evanw/esbuild/pkg/api"
+	"github.com/go-sourcemap/sourcemap"
 	"go.uber.org/multierr"
 	"gopkg.in/yaml.v3"
 	"rogchap.com/v8go"
@@ -92,6 +94,10 @@ export function generate(spec, config) {
 
 js_exports["generate"] = generate;`
 
+type errorGroup interface {
+	Errors() []error
+}
+
 func (c *GenerateCmd) Run(ctx *Context) error {
 	defer func() {
 		if c.prettier != nil {
@@ -115,7 +121,18 @@ func (c *GenerateCmd) Run(ctx *Context) error {
 		}
 	}
 
-	return merr
+	if merr != nil {
+		var errors []error
+		group, ok := err.(errorGroup)
+		if ok {
+			errors = group.Errors()
+		} else {
+			errors = []error{err}
+		}
+		return fmt.Errorf("generation failed due to %d error(s)", len(errors))
+	}
+
+	return nil
 }
 
 func (c *GenerateCmd) generateConfig(config Config) error {
@@ -194,19 +211,26 @@ func (c *GenerateCmd) generate(config Config) error {
 				Sourcefile: "generate.ts",
 				ResolveDir: workingDir,
 			},
+			Outdir:        ".",
+			Sourcemap:     api.SourceMapExternal,
 			Bundle:        true,
 			AbsWorkingDir: workingDir,
 			NodePaths:     []string{workingDir, srcDir},
-			LogLevel:      api.LogLevelInfo,
+			LogLevel:      api.LogLevelWarning,
 		})
 		if len(result.Errors) > 0 {
 			return fmt.Errorf("esbuild returned errors: %v", result.Errors)
 		}
-		if len(result.OutputFiles) != 1 {
-			return errors.New("esbuild did not produce exactly 1 output file")
+		if len(result.OutputFiles) != 2 {
+			return errors.New("esbuild did not produce exactly 2 output files")
 		}
 
-		bundle := string(result.OutputFiles[0].Contents)
+		bundle := string(result.OutputFiles[1].Contents)
+		smapBytes := result.OutputFiles[0].Contents
+		smap, err := sourcemap.Parse(result.OutputFiles[1].Path, smapBytes)
+		if err != nil {
+			return errors.New("could not parse sourcemap")
+		}
 
 		definitionsDir := filepath.Join(homeDir, "definitions")
 
@@ -274,8 +298,8 @@ func (c *GenerateCmd) generate(config Config) error {
 		res, err := j.Invoke("generate", spec, configMap)
 		if err != nil {
 			if jserr, ok := err.(*v8go.JSError); ok {
-				jserr.Message = strings.TrimPrefix(jserr.Message, "Error: ")
-				merr = appendAndPrintError(merr, "Runtime Error: %s", jserr.StackTrace)
+				stackTrace := translateStackTrace(smap, jserr.StackTrace)
+				merr = appendAndPrintError(merr, "%s", stackTrace)
 			} else {
 				merr = appendAndPrintError(merr, "Generation error: %w", err)
 			}
@@ -444,4 +468,54 @@ func appendAndPrintError(merr error, format string, a ...interface{}) error {
 	err := fmt.Errorf(format, a...)
 	fmt.Println(err)
 	return multierr.Append(merr, err)
+}
+
+func translateStackTrace(smap *sourcemap.Consumer, stackTrace string) string {
+	lines := strings.Split(stackTrace, "\n")
+	for i := 1; i < len(lines); i++ {
+		l := strings.TrimRight(lines[i], " \t")
+		idx := strings.LastIndex(l, "(")
+		bundleIdx := strings.LastIndex(l, "bundle.js:")
+
+		if strings.HasSuffix(l, ")") && idx != -1 {
+			loc := l[idx+1:]
+			loc = loc[:len(loc)-1]
+			l = l[:idx]
+			if source, line, column, ok := translateLocation(smap, loc); ok {
+				lines[i] = fmt.Sprintf("%s(%s:%d:%d)", l, source, line, column)
+			}
+		} else if bundleIdx != -1 {
+			loc := l[bundleIdx+1:]
+			l = l[:bundleIdx]
+			if source, line, column, ok := translateLocation(smap, loc); ok {
+				lines[i] = fmt.Sprintf("%s(%s:%d:%d)", l, source, line, column)
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func translateLocation(smap *sourcemap.Consumer, location string) (string, int, int, bool) {
+	parts := strings.Split(location, ":")
+	if len(parts) != 3 {
+		return "", 0, 0, false
+	}
+	line, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return "", 0, 0, false
+	}
+	column, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return "", 0, 0, false
+	}
+
+	source, _, l, c, ok := smap.Source(line, column)
+	if !ok {
+		return "", 0, 0, false
+	}
+	if src, err := filepath.Abs(source); err == nil {
+		source = src
+	}
+
+	return source, l, c, true
 }
