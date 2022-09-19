@@ -156,7 +156,7 @@ func (c *GenerateCmd) generate(config Config) error {
 	if err != nil {
 		return err
 	}
-	srcDir := filepath.Join(homeDir, "src")
+	srcDir := filepath.Join(homeDir, "node_modules")
 
 	var merr error
 

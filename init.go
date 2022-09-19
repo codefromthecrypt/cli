@@ -31,7 +31,7 @@ import (
 
 type InitCmd struct {
 	fromNew   bool
-	Template  string            `arg:"" help:"The template for the project to create."`
+	Template  string            `arg:"" help:"The template for the project to create." default:"@apexlang/basic"`
 	Dir       string            `type:"existingdir" help:"The project directory" default:"."`
 	Spec      string            `type:"existingfile" help:"An optional specification file to copy into the project"`
 	Variables map[string]string `arg:"" help:"Variables to pass to the template." optional:""`
@@ -47,12 +47,18 @@ func (c *InitCmd) Run(ctx *Context) error {
 		return err
 	}
 
-	if translation, exists := moduleAliases[c.Template]; exists {
-		c.Template = translation
-	}
-	c.Template = strings.ReplaceAll(c.Template, "/", string(filepath.Separator))
+	templatePart := strings.ReplaceAll(c.Template, "/", string(filepath.Separator))
+	templatePath := filepath.Join(homeDir, "templates", templatePart)
 
-	templatePath := filepath.Join(homeDir, "templates", c.Template)
+	// If a short name was provided and does not exist,
+	// assume its a first-party template and prepend "@apexlang/".
+	if !strings.HasPrefix(templatePart, "@") {
+		if _, err := os.Stat(templatePath); err != nil && os.IsNotExist(err) {
+			templatePart = filepath.Join("@apexlang", templatePart)
+			templatePath = filepath.Join(homeDir, "templates", templatePart)
+		}
+	}
+
 	templateDir, err := os.Stat(templatePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -146,7 +152,7 @@ func (c *InitCmd) Run(ctx *Context) error {
 
 	// TODO: Make dynamic (and secure)
 	switch c.Template {
-	case "@apexlang/codegen/local":
+	case "@apexlang/local":
 		cmd := exec.Command("npm", "install")
 		cmd.Dir = filepath.Join(c.Dir, "codegen")
 		cmd.Stdout = os.Stdout
@@ -154,7 +160,7 @@ func (c *InitCmd) Run(ctx *Context) error {
 		if err = cmd.Run(); err != nil {
 			return err
 		}
-	case "@apexlang/codegen/module":
+	case "@apexlang/module":
 		cmd := exec.Command("npm", "install")
 		cmd.Dir = c.Dir
 		cmd.Stdout = os.Stdout

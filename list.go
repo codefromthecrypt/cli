@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
@@ -40,7 +41,11 @@ func (c *ListTemplatesCmd) Run(ctx *Context) error {
 	}
 
 	templatesPath := filepath.Join(homeDir, "templates")
-	var files []string
+	type template struct {
+		name string
+		file string
+	}
+	var templates []template
 
 	if err = filepath.Walk(templatesPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -49,7 +54,12 @@ func (c *ListTemplatesCmd) Run(ctx *Context) error {
 		}
 
 		if !info.IsDir() && info.Name() == ".template" {
-			files = append(files, path)
+			relPath, err := filepath.Rel(templatesPath, filepath.Dir(path))
+			if err != nil {
+				return err
+			}
+			templateName := strings.ReplaceAll(relPath, string(filepath.Separator), "/")
+			templates = append(templates, template{templateName, path})
 		}
 
 		return nil
@@ -69,8 +79,8 @@ func (c *ListTemplatesCmd) Run(ctx *Context) error {
 		},
 	})
 	t.AppendHeader(table.Row{"Name", "Description"})
-	for _, file := range files {
-		templateBytes, err := os.ReadFile(file)
+	for _, tmpl := range templates {
+		templateBytes, err := os.ReadFile(tmpl.file)
 		if err != nil {
 			return err
 		}
@@ -80,7 +90,7 @@ func (c *ListTemplatesCmd) Run(ctx *Context) error {
 			return err
 		}
 
-		t.AppendRow(table.Row{template.Name, template.Description})
+		t.AppendRow(table.Row{tmpl.name, template.Description})
 	}
 	fmt.Println(t.Render())
 

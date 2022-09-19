@@ -27,6 +27,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -66,7 +67,7 @@ func (c *InstallCmd) doRun(ctx *Context, homeDir string) error {
 
 	c.createHTTPClient()
 
-	fmt.Printf("Getting release info for %s...\n", c.Location)
+	fmt.Printf("Getting release info for %s ...\n", c.Location)
 
 	release, err := c.getReleaseInfo(c.Location, c.Release)
 	if err != nil {
@@ -127,7 +128,6 @@ func (c *InstallCmd) doRun(ctx *Context, homeDir string) error {
 	}
 	defer os.RemoveAll(downloadDir)
 
-	fmt.Printf("Extracting %s...\n", filepath.Base(downloadURL))
 	switch fileType {
 	case "tar.gz":
 		if err = c.extractTarball(f.Name(), downloadDir); err != nil {
@@ -149,6 +149,28 @@ func (c *InstallCmd) doRun(ctx *Context, homeDir string) error {
 	for _, entry := range dirEntries {
 		if entry.IsDir() {
 			contentsDir := filepath.Join(downloadDir, entry.Name())
+
+			// If the dist directory does not exist, attempt to
+			// run npm to build it.
+			distDir := filepath.Join(contentsDir, "dist")
+			_, err := os.Stat(distDir)
+			if err != nil && os.IsNotExist(err) {
+				commands := [][]string{
+					{"npm", "install"},
+					{"npm", "run", "build"},
+				}
+
+				for _, cmd := range commands {
+					cmd := exec.Command(cmd[0], cmd[1:]...)
+					cmd.Dir = contentsDir
+					cmd.Stdout = os.Stdout
+					cmd.Stderr = os.Stderr
+					if err = cmd.Run(); err != nil {
+						return err
+					}
+				}
+			}
+
 			if err = readPackage(contentsDir, release); err != nil {
 				return err
 			}
@@ -320,42 +342,118 @@ func (c *InstallCmd) getReleaseInfoFromGithub(location, releaseTag string) (*rel
 	return &info, nil
 }
 
-var extensionDirectories = map[string]struct{}{
-	"src":         {},
-	"templates":   {},
-	"definitions": {},
-}
-
 func (c *InstallCmd) installDir(src string, dest string, org, modulePart string) error {
 	dirEntries, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
 
+	moduleRoot := filepath.Join(dest, "node_modules", modulePart)
+	if err = os.RemoveAll(moduleRoot); err != nil {
+		return err
+	}
+	if err = os.MkdirAll(moduleRoot, 0755); err != nil {
+		return err
+	}
+
 	for _, entry := range dirEntries {
-		if !entry.IsDir() {
+		base := filepath.Base(entry.Name())
+		destDir := filepath.Join(moduleRoot, base)
+
+		switch entry.Name() {
+		case "definitions", "templates":
+			destDir = filepath.Join(dest, base, org)
+		case ".git", ".github", ".gitignore", "node_modules", ".DS_Store":
 			continue
 		}
-
-		base := filepath.Base(entry.Name())
-		if _, ok := extensionDirectories[base]; ok {
-			fmt.Printf("Copying into ~/.apex/%s...\n", base)
-			destDir := filepath.Join(dest, base, modulePart)
-			if entry.Name() == "definitions" {
-				destDir = filepath.Join(dest, base, org)
-			}
-			if err = os.RemoveAll(destDir); err != nil {
-				return err
-			}
+		if entry.IsDir() {
 			if err = os.MkdirAll(destDir, 0755); err != nil {
 				return err
 			}
-			if err = c.copyRecursive(
-				filepath.Join(src, entry.Name()),
-				destDir,
-			); err != nil {
-				return err
-			}
+		}
+
+		srcPath := filepath.Join(src, entry.Name())
+		if err = c.copyRecursive(
+			srcPath,
+			destDir,
+		); err != nil {
+			return err
+		}
+	}
+
+	return c.handleShrinkwrap(dest, moduleRoot)
+}
+
+func (c *InstallCmd) handleShrinkwrap(dest, moduleRoot string) error {
+	// Check for npm-shrinkwrap.json which contains transitive dependency info.
+	shrinkwrapFile := filepath.Join(moduleRoot, "npm-shrinkwrap.json")
+	fi, err := os.Stat(shrinkwrapFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	if fi.IsDir() {
+		return nil
+	}
+
+	shrinkwrapBytes, err := os.ReadFile(shrinkwrapFile)
+	if err != nil {
+		return fmt.Errorf("could not read npm-shrinkwrap.json: %w", err)
+	}
+	var sw Shrinkwrap
+	if err = json.Unmarshal(shrinkwrapBytes, &sw); err != nil {
+		return fmt.Errorf("could not parse npm-shrinkwrap.json: %w", err)
+	}
+
+	i := 0
+	for moduleName, pkg := range sw.Packages {
+		i++
+		if !strings.HasPrefix(moduleName, "node_modules") || pkg.Dev || pkg.Extraneous {
+			continue
+		}
+
+		// Create a temp directory for the download.
+		downloadDir := filepath.Join(dest, fmt.Sprintf("dl-%d", i))
+		os.RemoveAll(downloadDir)
+		if err = os.MkdirAll(downloadDir, 0755); err != nil {
+			return err
+		}
+		defer os.RemoveAll(downloadDir)
+
+		f, err := os.CreateTemp("", "install-*")
+		if err != nil {
+			return err
+		}
+		defer func() {
+			f.Close()
+			os.Remove(f.Name())
+		}()
+
+		resp, err := c.netClient.Get(pkg.Resolved)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		io.Copy(f, resp.Body)
+		f.Close()
+
+		dest := filepath.Join(moduleRoot, moduleName)
+		if err = os.MkdirAll(dest, 0755); err != nil {
+			return err
+		}
+		if err = c.extractTarball(f.Name(), downloadDir); err != nil {
+			return err
+		}
+
+		if err = c.copyRecursive(
+			filepath.Join(downloadDir, "package"),
+			dest,
+		); err != nil {
+			return err
 		}
 	}
 
@@ -493,18 +591,14 @@ func (c *InstallCmd) extractZip(src string, dest string) error {
 
 func (c *InstallCmd) copyRecursive(source, destination string) error {
 	return filepath.Walk(source, func(path string, info os.FileInfo, ferr error) error {
-		var relPath string = strings.Replace(path, source, "", 1)
-		if relPath == "" {
-			return nil
-		}
-
+		relPath := strings.Replace(path, source, "", 1)
 		sourcePath := filepath.Join(source, relPath)
 		stat, err := os.Stat(sourcePath)
 		if err != nil {
 			return err
 		}
 		if info.IsDir() {
-			return os.Mkdir(filepath.Join(destination, relPath), stat.Mode())
+			return os.MkdirAll(filepath.Join(destination, relPath), stat.Mode())
 		} else {
 			data, err := os.ReadFile(sourcePath)
 			if err != nil {

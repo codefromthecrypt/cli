@@ -47,14 +47,10 @@ var commands struct {
 }
 
 func main() {
-	cli.AddModuleAliases(map[string]string{
-		"local":  "@apexlang/core/local",
-		"module": "@apexlang/core/module",
-	})
 	cli.AddDependencies(map[string][]string{
 		"@apexlang/codegen": {
-			"src/@apexlang/codegen",
-			"templates/@apexlang/codegen",
+			"node_modules/@apexlang/codegen",
+			"templates/@apexlang",
 			"definitions/@apexlang",
 		},
 	})

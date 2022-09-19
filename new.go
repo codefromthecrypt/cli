@@ -44,16 +44,6 @@ type NewCmd struct {
 	Variables map[string]string `arg:"" help:"Variables to pass to the template." optional:""`
 }
 
-var moduleAliases = map[string]string{
-	"module": "@apexlang/core/module",
-}
-
-func AddModuleAliases(aliases map[string]string) {
-	for name, path := range aliases {
-		moduleAliases[name] = path
-	}
-}
-
 func (c *NewCmd) Run(ctx *Context) error {
 	cwd, err := os.Getwd()
 	if err != nil {
