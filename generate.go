@@ -127,8 +127,12 @@ func (c *GenerateCmd) Run(ctx *Context) error {
 		if ok {
 			errors = group.Errors()
 		} else {
-			errors = []error{err}
+			errors = []error{merr}
 		}
+		if len(errors) == 1 {
+			return errors[0]
+		}
+
 		return fmt.Errorf("generation failed due to %d error(s)", len(errors))
 	}
 
