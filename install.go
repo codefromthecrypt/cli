@@ -26,6 +26,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -412,6 +413,10 @@ func (c *InstallCmd) handleShrinkwrap(dest, moduleRoot string) error {
 	for moduleName, pkg := range sw.Packages {
 		i++
 		if !strings.HasPrefix(moduleName, "node_modules") || pkg.Dev || pkg.Extraneous {
+			continue
+		}
+		if _, err := url.ParseRequestURI(pkg.Resolved); err != nil {
+			fmt.Printf("Warning: %s is not a valid URL. Skipping\n", pkg.Resolved)
 			continue
 		}
 
