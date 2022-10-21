@@ -319,6 +319,18 @@ func (c *GenerateCmd) generate(config Config) error {
 				merr = appendAndPrintError(merr, "Error formatting TypeScript: %w", err)
 				continue
 			}
+		case ".cs":
+			source, err = Astyle(source, "indent-namespaces break-blocks pad-comma indent=tab style=1tbs")
+			if err != nil {
+				merr = appendAndPrintError(merr, "Error formatting TypeScript: %w", err)
+				continue
+			}
+		case ".java", "c", "cpp", "c++", "h", "hpp", "h++":
+			source, err = Astyle(source, "pad-oper indent=tab style=google")
+			if err != nil {
+				merr = appendAndPrintError(merr, "Error formatting TypeScript: %w", err)
+				continue
+			}
 		}
 
 		dir := filepath.Dir(filename)
