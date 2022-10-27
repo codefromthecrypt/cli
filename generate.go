@@ -322,13 +322,13 @@ func (c *GenerateCmd) generate(config Config) error {
 		case ".cs":
 			source, err = Astyle(source, "indent-namespaces break-blocks pad-comma indent=tab style=1tbs")
 			if err != nil {
-				merr = appendAndPrintError(merr, "Error formatting TypeScript: %w", err)
+				merr = appendAndPrintError(merr, "Error formatting C#: %w", err)
 				continue
 			}
-		case ".java", "c", "cpp", "c++", "h", "hpp", "h++":
+		case ".java", "c", "cpp", "c++", "h", "hpp", "h++", "m":
 			source, err = Astyle(source, "pad-oper indent=tab style=google")
 			if err != nil {
-				merr = appendAndPrintError(merr, "Error formatting TypeScript: %w", err)
+				merr = appendAndPrintError(merr, "Error formatting Java/C/C++/Objective-C: %w", err)
 				continue
 			}
 		}
@@ -421,7 +421,7 @@ func (c *GenerateCmd) formatTypeScript(source string) (string, error) {
 }
 
 func formatRust(filename string) error {
-	cmd := exec.Command("rustfmt", filename)
+	cmd := exec.Command("rustfmt", "--edition", "2021", filename)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
